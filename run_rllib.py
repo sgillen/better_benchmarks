@@ -1,3 +1,5 @@
+from abc import ABC
+
 from ray import tune
 from ray.rllib.agents.trainer_template import build_trainer
 
@@ -25,10 +27,17 @@ class PPOFracPolicy(PPOTorchPolicy):
 def get_ppo_frac_policy_class(config):
     return PPOFracPolicy
 
+# https://github.com/ray-project/ray/blob/master/rllib/tuned_examples/ppo/halfcheetah-ppo.yaml
 PPO_CONFIG["num_sgd_iter"] = 32
 PPO_CONFIG["sgd_minibatch_size"] = 54096
 PPO_CONFIG["train_batch_size"] = 65536
 PPO_CONFIG["observation_filter"] = "MeanStdFilter"
+PPO_CONFIG["lr"] = .0003
+PPO_CONFIG["clip_param"] = .2
+PPO_CONFIG["grad_clip"] = .5
+PPO_CONFIG["kl_coeff"] = 1.0
+PPO_CONFIG["lambda"] = .95
+PPO_CONFIG["gamma"] = .99
 
 PPOFracTrainer = build_trainer(
     name="PPOFrac",
@@ -40,7 +49,7 @@ PPOFracTrainer = build_trainer(
 )
 
 PPOCTrainer = build_trainer(
-    name="PPOFrac",
+    name="PPOC",
     default_config=PPO_CONFIG,
     default_policy=None,
     execution_plan=ppo_execution_plan,
@@ -82,7 +91,7 @@ A2CFracTrainer = build_trainer(
 )
 
 A2CCTrainer = build_trainer(
-    name="A2CM",
+    name="A2CC",
     default_config=A2C_CONFIG,
     default_policy=None,
     get_policy_class=get_a2c_frac_policy_class,
@@ -90,17 +99,57 @@ A2CCTrainer = build_trainer(
     validate_config=a2c_validate_config
 )
 
-# from ray.rllib.agents.ars.ars import DEFAULT_CONFIG as A
-# from ray.rllib.agents.a3c import A2CTrainer#
+# ARS =======================================================================================
+from ray.rllib.agents.ars.ars import DEFAULT_CONFIG as ARS_CONFIG
+from ray.rllib.agents.ars.ars_torch_policy import ARSTorchPolicy
+from ray.rllib.agents.es.es import validate_config
+from ray.rllib.env.env_context import EnvContext
 
-env_names = tune.grid_search(["Walker2d-v2", "Hopper-v2", "HalfCheetah-v2"])
-fr_policy_trainers = [PPOFracTrainer, A2CFracTrainer]#, ARSTrainer, A2CTrainer]
-on_policy_trainers = [PPOCTrainer, ARSTrainer, A2CCTrainer]
+ARS_CONFIG["noise_stdev"] = .05
+ARS_CONFIG['sgd_stepsize'] = .05
 
-all_trainers = [*fr_policy_trainers, *on_policy_trainers]
 
-print(all_trainers)
-tune.run(all_trainers,
-         config={"env": env_names, "batch_mode": "complete_episodes", "framework": "torch"},
-         checkpoint_at_end=True,
-         stop={"time_total_s": 3600})
+class ARSFracPolicy(ARSTorchPolicy):
+    def postprocess_trajectory(self, sample_batch, other_agent_batches=None, episode=None):
+        sample_batch[sample_batch.REWARDS] = mdim_div_stable(sample_batch[sample_batch.OBS], sample_batch[sample_batch.ACTIONS],sample_batch[sample_batch.REWARDS])
+        return super().postprocess_trajectory(sample_batch, other_agent_batches, episode)
+
+def get_ars_frac_policy_class(config):
+    return ARSFracPolicy
+
+
+class ARSFracTrainer(ARSTrainer):
+    _default_config = ARS_CONFIG
+
+    def _init(self, config, env_creator):
+        super()._init(config, env_creator)
+        validate_config(config)
+        env_context = EnvContext(config["env_config"] or {}, worker_index=0)
+        env = env_creator(env_context)
+
+        policy_cls = get_ars_frac_policy_class(config)
+        self.policy = policy_cls(env.observation_space, env.action_space, config)
+
+class ARSCTrainer(ARSTrainer):
+    _default_config = ARS_CONFIG
+
+
+# main =======================================================================================
+
+if __name__ == "__main__":
+    log_dir = input("Enter a name for the run: ")
+    input(f"saving in ./{log_dir}, press anything to continue: ")
+
+    env_names = tune.grid_search(["Walker2d-v2", "Hopper-v2", "HalfCheetah-v2"])
+    fr_policy_trainers = [PPOFracTrainer, A2CFracTrainer, ARSFracTrainer]#, ARSTrainer, A2CTrainer]
+    on_policy_trainers = [PPOCTrainer, ARSCTrainer, A2CCTrainer]
+    #all_trainers = [*fr_policy_trainers, *on_policy_trainers]
+    all_trainers = [ARSFracTrainer, ARSCTrainer]
+    
+    print(all_trainers)
+    tune.run(all_trainers,
+             config={"env": env_names, "batch_mode": "complete_episodes", "framework": "torch"},
+             checkpoint_at_end=True,
+             local_dir=log_dir,
+             stop={"time_total_s": 36000})
+    
