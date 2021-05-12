@@ -3,6 +3,7 @@ from abc import ABC
 from ray import tune
 from ray.rllib.agents.trainer_template import build_trainer
 
+import pybullet_envs
 import seagul.envs
 from seagul.mesh import mdim_div_stable
 
@@ -17,6 +18,8 @@ from ray.rllib.agents.ppo.ppo import execution_plan as ppo_execution_plan
 from ray.rllib.agents.ppo.ppo_torch_policy import PPOTorchPolicy
 from ray.rllib.agents.ppo.ppo import get_policy_class as get_ppo_policy_class
 
+# import torch
+# torch.set_default_dtype(torch.float32)
 
 class PPOFracPolicy(PPOTorchPolicy):
     def postprocess_trajectory(self, sample_batch, other_agent_batches=None, episode=None):
@@ -119,6 +122,8 @@ def get_ars_frac_policy_class(config):
 
 
 class ARSFracTrainer(ARSTrainer):
+    _name = "ARSFrac"
+    __name__ = "ARSFrac"
     _default_config = ARS_CONFIG
 
     def _init(self, config, env_creator):
@@ -131,6 +136,8 @@ class ARSFracTrainer(ARSTrainer):
         self.policy = policy_cls(env.observation_space, env.action_space, config)
 
 class ARSCTrainer(ARSTrainer):
+    _name = "ARSC"
+    __name__ = "ARSC"
     _default_config = ARS_CONFIG
 
 
@@ -140,16 +147,24 @@ if __name__ == "__main__":
     log_dir = input("Enter a name for the run: ")
     input(f"saving in ./{log_dir}, press anything to continue: ")
 
-    env_names = tune.grid_search(["Walker2d-v2", "Hopper-v2", "HalfCheetah-v2"])
-    fr_policy_trainers = [PPOFracTrainer, A2CFracTrainer, ARSFracTrainer]#, ARSTrainer, A2CTrainer]
-    on_policy_trainers = [PPOCTrainer, ARSCTrainer, A2CCTrainer]
-    #all_trainers = [*fr_policy_trainers, *on_policy_trainers]
-    all_trainers = [ARSFracTrainer, ARSCTrainer]
+    env_names = tune.grid_search(["Walker2DBulletEnv-v0", "HopperBulletEnv-v0", "HalfCheetahBulletEnv-v0" ])
+    #env_names = tune.grid_search(["Walker2d-v2", "Hopper-v2", "HalfCheetah-v2"])
+    #env_names =  tune.grid_search(["Humanoid-v2"])
+    fr_policy_trainers = [PPOFracTrainer]#, ARSFracTrainer]#, ARSTrainer, A2CTrainer]
+    on_policy_trainers = [PPOCTrainer]#, ARSCTrainer]
+
+
+    #all_trainers = [PPOCTrainer]
+    all_trainers = [*fr_policy_trainers, *on_policy_trainers]
+    #all_trainers = [ARSFracTrainer, ARSCTrainer]
     
     print(all_trainers)
     tune.run(all_trainers,
              config={"env": env_names, "batch_mode": "complete_episodes", "framework": "torch"},
              checkpoint_at_end=True,
              local_dir=log_dir,
-             stop={"time_total_s": 36000})
-    
+             num_samples=4,
+             stop={"timesteps_total": int(2e7)},
+             )
+
+    #{"time_total_s": 144000}
