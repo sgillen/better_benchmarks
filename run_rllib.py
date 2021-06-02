@@ -11,6 +11,8 @@ from ray.rllib.agents.ppo import PPOTrainer
 from ray.rllib.agents.a3c import A2CTrainer
 from ray.rllib.agents.ars import ARSTrainer
 
+mdim_keyword_args = {"init_d":1e-6}
+
 # PPO =======================================================================================
 from ray.rllib.agents.ppo.ppo import DEFAULT_CONFIG as PPO_CONFIG
 from ray.rllib.agents.ppo.ppo import validate_config as ppo_validate_config
@@ -23,7 +25,7 @@ from ray.rllib.agents.ppo.ppo import get_policy_class as get_ppo_policy_class
 
 class PPOFracPolicy(PPOTorchPolicy):
     def postprocess_trajectory(self, sample_batch, other_agent_batches=None, episode=None):
-        sample_batch[sample_batch.REWARDS] = mdim_div_stable(sample_batch[sample_batch.OBS], sample_batch[sample_batch.ACTIONS], sample_batch[sample_batch.REWARDS])
+        sample_batch[sample_batch.REWARDS] = mdim_div_stable(sample_batch[sample_batch.OBS], sample_batch[sample_batch.ACTIONS], sample_batch[sample_batch.REWARDS], mdim_keyword_args)
         return super().postprocess_trajectory(sample_batch, other_agent_batches, episode)
 
 
@@ -70,7 +72,7 @@ from ray.rllib.agents.a3c.a2c import get_policy_class as get_a2c_policy_class
 
 class A2CFracPolicy(A3CTorchPolicy):
     def postprocess_trajectory(self, sample_batch, other_agent_batches=None, episode=None):
-        sample_batch[sample_batch.REWARDS] = mdim_div_stable(sample_batch[sample_batch.OBS], sample_batch[sample_batch.ACTIONS], sample_batch[sample_batch.REWARDS])
+        sample_batch[sample_batch.REWARDS] = mdim_div_stable(sample_batch[sample_batch.OBS], sample_batch[sample_batch.ACTIONS], sample_batch[sample_batch.REWARDS], mdim_keyword_args)
         return super().postprocess_trajectory(sample_batch, other_agent_batches, episode)
 
 
@@ -114,7 +116,7 @@ ARS_CONFIG['sgd_stepsize'] = .05
 
 class ARSFracPolicy(ARSTorchPolicy):
     def postprocess_trajectory(self, sample_batch, other_agent_batches=None, episode=None):
-        sample_batch[sample_batch.REWARDS] = mdim_div_stable(sample_batch[sample_batch.OBS], sample_batch[sample_batch.ACTIONS],sample_batch[sample_batch.REWARDS])
+        sample_batch[sample_batch.REWARDS] = mdim_div_stable(sample_batch[sample_batch.OBS], sample_batch[sample_batch.ACTIONS],sample_batch[sample_batch.REWARDS], mdim_keyword_args)
         return super().postprocess_trajectory(sample_batch, other_agent_batches, episode)
 
 def get_ars_frac_policy_class(config):
@@ -147,8 +149,8 @@ if __name__ == "__main__":
     log_dir = input("Enter a name for the run: ")
     input(f"saving in ./{log_dir}, press anything to continue: ")
 
-    env_names = tune.grid_search(["Walker2DBulletEnv-v0", "HopperBulletEnv-v0", "HalfCheetahBulletEnv-v0" ])
-    #env_names = tune.grid_search(["Walker2d-v2", "Hopper-v2", "HalfCheetah-v2"])
+    #env_names = tune.grid_search(["Walker2DBulletEnv-v0", "HopperBulletEnv-v0", "HalfCheetahBulletEnv-v0" ])
+    env_names = tune.grid_search(["Walker2d-v2", "Hopper-v2", "HalfCheetah-v2"])
     #env_names =  tune.grid_search(["Humanoid-v2"])
     fr_policy_trainers = [PPOFracTrainer]#, ARSFracTrainer]#, ARSTrainer, A2CTrainer]
     on_policy_trainers = [PPOCTrainer]#, ARSCTrainer]
