@@ -144,20 +144,22 @@ class ARSCTrainer(ARSTrainer):
 
 
 # main =======================================================================================
+import gym_cassie
 
 if __name__ == "__main__":
     log_dir = input("Enter a name for the run: ")
     input(f"saving in ./{log_dir}, press anything to continue: ")
 
     #env_names = tune.grid_search(["Walker2DBulletEnv-v0", "HopperBulletEnv-v0", "HalfCheetahBulletEnv-v0" ])
-    env_names = tune.grid_search(["Walker2d-v2", "Hopper-v2", "HalfCheetah-v2"])
+    #env_names = tune.grid_search(["Walker2d-v2", "Hopper-v2", "HalfCheetah-v2"])
     #env_names =  tune.grid_search(["Humanoid-v2"])
     fr_policy_trainers = [PPOFracTrainer]#, ARSFracTrainer]#, ARSTrainer, A2CTrainer]
     on_policy_trainers = [PPOCTrainer]#, ARSCTrainer]
 
 
-    #all_trainers = [PPOCTrainer]
-    all_trainers = [*fr_policy_trainers, *on_policy_trainers]
+    all_trainers = [PPOCTrainer]
+    env_names = tune.grid_search(["Cassie-v0"])
+    #all_trainers = [*fr_policy_trainers, *on_policy_trainers]
     #all_trainers = [ARSFracTrainer, ARSCTrainer]
     
     print(all_trainers)
